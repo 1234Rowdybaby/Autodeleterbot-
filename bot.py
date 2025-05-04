@@ -1,48 +1,54 @@
-from telegram import Update, ChatMember
-from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, CommandHandler
 import os
+import time
+from telegram import Bot, Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")  # Replace with your actual token
-DELETE_DELAY = 3  # Default delete time in seconds
+# Get the bot token from environment variable
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+DELETE_DELAY = 1  # Set delete delay to 1 second
 
+# Initialize the Updater and Bot
+updater = Updater(token=BOT_TOKEN, use_context=True)
+dispatcher = updater.dispatcher
+bot = Bot(token=BOT_TOKEN)
+
+# Function to delete messages
 def delete_msg(update: Update, context: CallbackContext):
     global DELETE_DELAY
-    if update.effective_message:
-        user_id = update.effective_message.from_user.id
-        chat_id = update.effective_chat.id
-        bot_member = context.bot.get_chat_member(chat_id, context.bot.id)
-        user_member = context.bot.get_chat_member(chat_id, user_id)
+    message = update.message
+    if message.chat.type == "supergroup":
+        user_id = message.from_user.id
+        chat_id = message.chat.id
+        user_member = bot.get_chat_member(chat_id, user_id)
+        if user_member.status in ["administrator", "creator"]:
+            return  # Skip deleting admin's messages
+        time.sleep(DELETE_DELAY)
+        bot.delete_message(chat_id, message.message_id)
 
-        # Skip deleting messages from admins (like Auto Filter Bot)
-        if user_member.status in [ChatMember.ADMINISTRATOR, ChatMember.CREATOR]:
-            return
-
-        context.job_queue.run_once(
-            lambda c: context.bot.delete_message(chat_id=chat_id, message_id=update.effective_message.message_id),
-            DELETE_DELAY
-        )
-
+# Command to set the delete timer (only for owner or admins)
 def set_timer(update: Update, context: CallbackContext):
     global DELETE_DELAY
-    if context.args:
-        try:
-            new_time = int(context.args[0])
-            DELETE_DELAY = new_time
-            update.message.reply_text(f"Delete timer set to {new_time} seconds.")
-        except ValueError:
-            update.message.reply_text("Please send a number only.")
-    else:
-        update.message.reply_text("Usage: /settimer 5")
+    user_id = update.message.from_user.id
+    chat_id = update.message.chat.id
+    user_member = bot.get_chat_member(chat_id, user_id)
+    if user_member.status not in ["administrator", "creator"]:
+        update.message.reply_text("Only the owner or admins can set the timer.")
+        return
+    try:
+        new_time = int(context.args[0]) if context.args else DELETE_DELAY
+        DELETE_DELAY = new_time
+        update.message.reply_text(f"Delete timer set to {new_time} seconds.")
+    except ValueError:
+        update.message.reply_text("Please provide a valid number.")
 
-def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+# Handlers
+delete_handler = MessageHandler(Filters.text & Filters.group, delete_msg)
+timer_handler = CommandHandler('settimer', set_timer)
 
-    dp.add_handler(MessageHandler(Filters.text & Filters.group, delete_msg))
-    dp.add_handler(CommandHandler("settimer", set_timer))
+# Add handlers to the dispatcher
+dispatcher.add_handler(delete_handler)
+dispatcher.add_handler(timer_handler)
 
-    updater.start_polling()
-    updater.idle()
-
-if name == 'main':
-    main()
+# Start the bot
+updater.start_polling()
+updater.idle()
