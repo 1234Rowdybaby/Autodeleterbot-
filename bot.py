@@ -4,7 +4,7 @@ from telegram import Bot, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
 # Get the bot token from environment variable
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("8004912313:AAErhBNd3yyAwafrjbRf2tA4H4sX1s6Rb6U")
 DELETE_DELAY = 1  # Set delete delay to 1 second
 
 # Initialize the Updater and Bot
